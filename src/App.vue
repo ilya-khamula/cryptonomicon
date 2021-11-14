@@ -174,8 +174,9 @@
               <div
                 v-for="(bar, idx) in normalizeGraph()"
                 :key="idx"
-                :style="{height: `${bar}%`}"
-                class="bg-purple-800 border w-10"></div>
+                :style="{ height: `${bar}%` }"
+                class="bg-purple-800 border w-10"
+              ></div>
             </div>
             <button
               v-on:click="selectTicker = null"
@@ -271,11 +272,9 @@ export default {
       const maxValue = Math.max(...this.graph);
       const minValue = Math.min(...this.graph);
       return this.graph.map(
-        item => 5 + ((item - minValue) * 95) / (maxValue - minValue)
+        (item) => 5 + ((item - minValue) * 95) / (maxValue - minValue)
       );
     },
   },
 };
 </script>
-
-<style src="./assets/css/app.css" lang="css"></style>
