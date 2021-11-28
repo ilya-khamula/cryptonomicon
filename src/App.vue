@@ -15,12 +15,13 @@
               <label
                 for="wallet"
                 class="block text-sm font-medium text-gray-700"
-                >Тикер</label
+              >Тикер</label
               >
               <div class="mt-1 relative rounded-md shadow-md">
                 <input
                   v-model="inputTicker"
-                  v-on:keydown.enter="add"
+                  v-on:input="changeOnInput"
+                  v-on:keydown.enter="beforeAdd"
                   type="text"
                   name="wallet"
                   id="wallet"
@@ -38,26 +39,49 @@
                 />
               </div>
 
-              <!--                            <div class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap">-->
-              <!--                                <span class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">-->
-              <!--                                  BTC-->
-              <!--                                </span>-->
-              <!--                                <span class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">-->
-              <!--                                  DOGE-->
-              <!--                                </span>-->
-              <!--                                <span class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">-->
-              <!--                                  BCH-->
-              <!--                                </span>-->
-              <!--                                <span class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">-->
-              <!--                                  CHD-->
-              <!--                                </span>-->
-              <!--                            </div>-->
+              <div
+                v-if="autocompleteList.length"
+                class="
+                  flex
+                  bg-white
+                  shadow-md
+                  p-1
+                  rounded-md
+                  shadow-md
+                  flex-wrap
+                "
+              >
+                <span
+                  v-for="item in autocompleteList"
+                  v-bind:key="item"
+                  @click="addTickerFromAutocomplete(item)"
+                  class="
+                    inline-flex
+                    items-center
+                    px-2
+                    m-1
+                    rounded-md
+                    text-xs
+                    font-medium
+                    bg-gray-300
+                    text-gray-800
+                    cursor-pointer
+                  "
+                >
+                  {{ item }}
+                </span>
+              </div>
 
-              <!--                            <div class="text-sm text-red-600">Такой тикер уже добавлен</div>-->
+              <div
+                v-if="errorDuplicateInputTicker"
+                class="text-sm text-red-600"
+              >
+                Такой тикер уже добавлен
+              </div>
             </div>
           </div>
           <button
-            v-on:click="add"
+            v-on:click="beforeAdd(inputTicker)"
             type="button"
             class="
               my-4
@@ -99,7 +123,7 @@
         </section>
 
         <template v-if="addedTickers.length">
-          <hr class="w-full border-t border-gray-600 my-4" />
+          <hr class="w-full border-t border-gray-600 my-4"/>
           <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
             <div
               v-for="item in addedTickers"
@@ -165,7 +189,7 @@
         </template>
 
         <template v-if="selectTicker">
-          <hr class="w-full border-t border-gray-600 my-4" />
+          <hr class="w-full border-t border-gray-600 my-4"/>
           <section class="relative">
             <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
               {{ selectTicker.name }} - USD
@@ -218,11 +242,14 @@ export default {
 
   data() {
     return {
-      inputTicker: "",
-      addedTickers: [],
       getDataTickers: "",
+      inputTicker: "",
+      autocompleteList: [],
+      addedTickers: [],
+      addedTickerNames: [],
       selectTicker: null,
       graph: [],
+      errorDuplicateInputTicker: false,
     };
   },
 
@@ -235,37 +262,85 @@ export default {
   },
 
   methods: {
+    changeOnInput: function () {
+      this.inputTicker = this.inputTicker.toUpperCase();
+      this.errorDuplicateInputTicker = false;
+      this.updateAutocompleteList();
+    },
+
+    updateAutocompleteList: function () {
+      this.autocompleteList = [];
+      if (this.inputTicker === "") {
+        this.autocompleteList = [];
+      } else {
+        for (let ticker in this.getDataTickers) {
+          let getDataTickersSymbol = this.getDataTickers[ticker]["Symbol"].toUpperCase();
+          if (getDataTickersSymbol.includes(this.inputTicker) && this.autocompleteList.length < 4) {
+            this.autocompleteList.push(getDataTickersSymbol);
+          }
+        }
+      }
+    },
+
+    addTickerFromAutocomplete: function (tickerName) {
+      this.inputTicker = tickerName;
+      this.beforeAdd();
+    },
+
+    beforeAdd: function () {
+      if (this.inputTicker.length && this.addedTickers.length) {
+        if (this.addedTickerNames.includes(this.inputTicker)) {
+          this.errorDuplicateInputTicker = true;
+        } else {
+          this.add();
+        }
+      } else if (this.inputTicker.length) {
+        this.add();
+      }
+    },
+
     add: function () {
       const currentTicker = {
         name: this.inputTicker,
         value: "-",
       };
-      this.addedTickers.push(currentTicker);
 
+      this.addedTickers.push(currentTicker);
+      this.addedTickerNames.push(currentTicker.name);
+
+      this.getTickerValue(currentTicker.name);
+
+      this.inputTicker = "";
+      this.autocompleteList = [];
+      this.errorDuplicateInputTicker = false;
+    },
+
+    getTickerValue: function (currentTickerName) {
       setInterval(async () => {
         const f = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=ce3fd966e7a1d10d65f907b20bf000552158fd3ed1bd614110baa0ac6cb57a7e`
+          `https://min-api.cryptocompare.com/data/price?fsym=${currentTickerName}&tsyms=USD&api_key=ce3fd966e7a1d10d65f907b20bf000552158fd3ed1bd614110baa0ac6cb57a7e`
         );
         const data = await f.json();
         // currentTicker.value = data.USD;
-        this.addedTickers.find((t) => t.name === currentTicker.name).value =
-          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+        if (this.addedTickers.length) {
+          this.addedTickers.find((t) => t.name === currentTickerName).value =
+            data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
 
-        if (this.selectTicker?.name === currentTicker.name) {
-          this.graph.push(data.USD);
+          if (this.selectTicker?.name === currentTickerName) {
+            this.graph.push(data.USD);
+          }
         }
       }, 3000);
+    },
 
-      this.inputTicker = "";
+    handleDelete: function (tickerToDelete) {
+      this.addedTickers = this.addedTickers.filter((t) => t !== tickerToDelete);
+      this.addedTickerNames = this.addedTickerNames.filter((t) => t !== tickerToDelete.name);
     },
 
     select(ticker) {
       this.selectTicker = ticker;
       this.graph = [];
-    },
-
-    handleDelete: function (tickerToDelete) {
-      this.addedTickers = this.addedTickers.filter((t) => t !== tickerToDelete);
     },
 
     normalizeGraph() {
